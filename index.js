@@ -7,13 +7,14 @@ const { Pool } = pg;
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "2.0.0",
+  version: "2.1.0",
 });
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const DEFAULT_SCHEMA = process.env.VERUS_DEFAULT_SCHEMA || "public";
 const MAX_ROWS = Number(process.env.VERUS_MAX_ROWS || 100);
 const HARD_MAX_ROWS = 500;
+const STATEMENT_TIMEOUT_MS = Number(process.env.VERUS_STATEMENT_TIMEOUT_MS || 15000);
 
 if (!DATABASE_URL) {
   console.error("[verus-mcp-geral] DATABASE_URL não definida");
@@ -60,6 +61,7 @@ async function readOnlyQuery(sql, params = []) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN READ ONLY");
+    await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
     const result = await client.query(sql, params);
     await client.query("ROLLBACK");
     return result;
@@ -296,7 +298,7 @@ server.tool(
 // ========================================
 server.tool(
   "listRecords",
-  "Lista registros paginados de uma tabela. Sempre use describeTable antes pra conhecer colunas reais.",
+  "Lista registros paginados de uma tabela. Aceita filtro `where` (igualdade simples por coluna). Sempre use describeTable antes pra conhecer colunas reais.",
   {
     table: z.string(),
     schema: z.string().optional().default(DEFAULT_SCHEMA),
@@ -304,14 +306,35 @@ server.tool(
     limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
     orderBy: z.string().optional().describe("Coluna pra ORDER BY (opcional)"),
     direction: z.enum(["ASC", "DESC"]).optional().default("ASC"),
+    where: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      .optional()
+      .describe('Filtros de igualdade: { "coluna": valor, ... }. Valor null vira IS NULL.'),
   },
-  async ({ table, schema, page, limit, orderBy, direction }) => {
+  async ({ table, schema, page, limit, orderBy, direction, where }) => {
     try {
       const offset = (page - 1) * limit;
       const order = orderBy ? `ORDER BY "${safeIdent(orderBy)}" ${direction}` : "ORDER BY 1";
-      const sql = `SELECT * FROM ${qualified(schema, table)} ${order} LIMIT $1 OFFSET $2`;
-      const { rows } = await readOnlyQuery(sql, [limit, offset]);
-      return jsonTxt({ success: true, page, limit, total: rows.length, records: rows });
+
+      const whereClauses = [];
+      const params = [];
+      if (where && typeof where === "object") {
+        for (const [col, val] of Object.entries(where)) {
+          const safeCol = safeIdent(col);
+          if (!safeCol) continue;
+          if (val === null) {
+            whereClauses.push(`"${safeCol}" IS NULL`);
+          } else {
+            params.push(val);
+            whereClauses.push(`"${safeCol}" = $${params.length}`);
+          }
+        }
+      }
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+      params.push(limit, offset);
+      const sql = `SELECT * FROM ${qualified(schema, table)} ${whereSql} ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`;
+      const { rows } = await readOnlyQuery(sql, params);
+      return jsonTxt({ success: true, page, limit, total: rows.length, filters: where || {}, records: rows });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
@@ -369,6 +392,89 @@ server.tool(
 );
 
 // ========================================
+// Tool: distinctValues
+// ========================================
+server.tool(
+  "distinctValues",
+  "Lista valores únicos de uma coluna com contagem. Crítico pra descobrir valores possíveis antes de filtrar (status, tipo, categoria). Use antes de listRecords com where.",
+  {
+    table: z.string(),
+    column: z.string(),
+    schema: z.string().optional().default(DEFAULT_SCHEMA),
+    limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
+  },
+  async ({ table, column, schema, limit }) => {
+    try {
+      const safeCol = safeIdent(column);
+      const sql = `SELECT "${safeCol}" AS value, COUNT(*)::bigint AS count
+                   FROM ${qualified(schema, table)}
+                   GROUP BY "${safeCol}"
+                   ORDER BY count DESC, value
+                   LIMIT $1`;
+      const { rows } = await readOnlyQuery(sql, [limit]);
+      return jsonTxt({
+        success: true,
+        column: safeCol,
+        total: rows.length,
+        values: rows.map(r => ({ value: r.value, count: Number(r.count) })),
+      });
+    } catch (error) {
+      return jsonTxt({ success: false, error: error.message });
+    }
+  }
+);
+
+// ========================================
+// Tool: sampleTable
+// ========================================
+server.tool(
+  "sampleTable",
+  "Retorna N linhas amostradas pra inspecionar o formato real dos dados (datas, máscaras de CPF/CNPJ, enums, etc) antes de montar consultas.",
+  {
+    table: z.string(),
+    schema: z.string().optional().default(DEFAULT_SCHEMA),
+    n: z.number().int().positive().max(50).optional().default(5),
+  },
+  async ({ table, schema, n }) => {
+    try {
+      const sql = `SELECT * FROM ${qualified(schema, table)} ORDER BY random() LIMIT $1`;
+      const { rows } = await readOnlyQuery(sql, [n]);
+      return jsonTxt({ success: true, table: `${safeIdent(schema)}.${safeIdent(table)}`, total: rows.length, sample: rows });
+    } catch (error) {
+      return jsonTxt({ success: false, error: error.message });
+    }
+  }
+);
+
+// ========================================
+// Tool: listEnums
+// ========================================
+server.tool(
+  "listEnums",
+  "Lista tipos enum customizados do Postgres e seus valores. Use quando describeTable mostrar uma coluna com data_type='USER-DEFINED' pra descobrir valores válidos.",
+  {
+    schema: z.string().optional().default(DEFAULT_SCHEMA),
+  },
+  async ({ schema }) => {
+    try {
+      const sql = `
+        SELECT n.nspname AS schema, t.typname AS enum_name,
+               array_agg(e.enumlabel ORDER BY e.enumsortorder) AS values
+        FROM pg_type t
+        JOIN pg_enum e ON e.enumtypid = t.oid
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = $1
+        GROUP BY n.nspname, t.typname
+        ORDER BY t.typname`;
+      const { rows } = await readOnlyQuery(sql, [safeIdent(schema)]);
+      return jsonTxt({ success: true, schema: safeIdent(schema), total: rows.length, enums: rows });
+    } catch (error) {
+      return jsonTxt({ success: false, error: error.message });
+    }
+  }
+);
+
+// ========================================
 // Tool: runSelect
 // ========================================
 server.tool(
@@ -403,7 +509,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v2.0.0 rodando via STDIO (READ ONLY)...");
+console.error("verus-mcp-geral v2.1.0 rodando via STDIO (READ ONLY)...");
 
 const shutdown = async () => {
   try { await pool.end(); } catch {}
