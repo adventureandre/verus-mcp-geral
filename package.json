@@ -1,9 +1,25 @@
 {
-  "name": "verus-mcp-geral",
+  "name": "@expertcustom/verus-mcp-geral",
   "version": "2.1.0",
+  "description": "MCP server para consultas read-only no Postgres do Verus",
+  "license": "UNLICENSED",
   "type": "module",
   "main": "index.js",
+  "bin": {
+    "verus-mcp-geral": "index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "build": "chmod +x index.js",
+    "prepublishOnly": "npm run build",
     "start": "node index.js"
   },
   "dependencies": {

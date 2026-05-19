@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -14,7 +16,9 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const DEFAULT_SCHEMA = process.env.VERUS_DEFAULT_SCHEMA || "public";
 const MAX_ROWS = Number(process.env.VERUS_MAX_ROWS || 100);
 const HARD_MAX_ROWS = 500;
-const STATEMENT_TIMEOUT_MS = Number(process.env.VERUS_STATEMENT_TIMEOUT_MS || 15000);
+const STATEMENT_TIMEOUT_MS = Number(
+  process.env.VERUS_STATEMENT_TIMEOUT_MS || 15000,
+);
 
 if (!DATABASE_URL) {
   console.error("[verus-mcp-geral] DATABASE_URL não definida");
@@ -41,8 +45,16 @@ const WRITE_KEYWORDS =
 function isReadOnlySql(sql) {
   const trimmed = sql.trim().replace(/;+\s*$/, "");
   const upper = trimmed.toUpperCase();
-  if (!upper.startsWith("SELECT") && !upper.startsWith("WITH") && !upper.startsWith("SHOW") && !upper.startsWith("EXPLAIN")) {
-    return { ok: false, reason: "Apenas SELECT/WITH/SHOW/EXPLAIN são permitidos" };
+  if (
+    !upper.startsWith("SELECT") &&
+    !upper.startsWith("WITH") &&
+    !upper.startsWith("SHOW") &&
+    !upper.startsWith("EXPLAIN")
+  ) {
+    return {
+      ok: false,
+      reason: "Apenas SELECT/WITH/SHOW/EXPLAIN são permitidos",
+    };
   }
   if (WRITE_KEYWORDS.test(trimmed)) {
     return { ok: false, reason: "Comando contém keyword de escrita bloqueada" };
@@ -66,7 +78,9 @@ async function readOnlyQuery(sql, params = []) {
     await client.query("ROLLBACK");
     return result;
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch {}
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
     throw err;
   } finally {
     client.release();
@@ -91,13 +105,17 @@ server.tool(
          FROM information_schema.schemata
          WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast')
            AND schema_name NOT LIKE 'pg_%'
-         ORDER BY schema_name`
+         ORDER BY schema_name`,
       );
-      return jsonTxt({ success: true, total: rows.length, schemas: rows.map(r => r.schema_name) });
+      return jsonTxt({
+        success: true,
+        total: rows.length,
+        schemas: rows.map((r) => r.schema_name),
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -107,7 +125,10 @@ server.tool(
   "listTables",
   "Lista as tabelas e views de um schema (default: public). Útil pra IA descobrir o que existe no banco antes de consultar.",
   {
-    schema: z.string().optional().default(DEFAULT_SCHEMA)
+    schema: z
+      .string()
+      .optional()
+      .default(DEFAULT_SCHEMA)
       .describe("Schema a inspecionar (default: public)"),
   },
   async ({ schema }) => {
@@ -118,13 +139,18 @@ server.tool(
          FROM information_schema.tables
          WHERE table_schema = $1
          ORDER BY table_name`,
-        [safe]
+        [safe],
       );
-      return jsonTxt({ success: true, schema: safe, total: rows.length, tables: rows });
+      return jsonTxt({
+        success: true,
+        schema: safe,
+        total: rows.length,
+        tables: rows,
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -147,10 +173,13 @@ server.tool(
          FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = $2
          ORDER BY ordinal_position`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
       if (columns.length === 0) {
-        return jsonTxt({ success: false, error: `Tabela '${safeS}.${safeT}' não encontrada` });
+        return jsonTxt({
+          success: false,
+          error: `Tabela '${safeS}.${safeT}' não encontrada`,
+        });
       }
 
       const { rows: primaryKey } = await readOnlyQuery(
@@ -162,7 +191,7 @@ server.tool(
          WHERE tc.constraint_type = 'PRIMARY KEY'
            AND tc.table_schema = $1 AND tc.table_name = $2
          ORDER BY kcu.ordinal_position`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
 
       const { rows: foreignKeys } = await readOnlyQuery(
@@ -187,7 +216,7 @@ server.tool(
          WHERE tc.constraint_type = 'FOREIGN KEY'
            AND tc.table_schema = $1 AND tc.table_name = $2
          ORDER BY tc.constraint_name, kcu.ordinal_position`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
 
       const { rows: uniques } = await readOnlyQuery(
@@ -199,7 +228,7 @@ server.tool(
          WHERE tc.constraint_type = 'UNIQUE'
            AND tc.table_schema = $1 AND tc.table_name = $2
          ORDER BY tc.constraint_name, kcu.ordinal_position`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
 
       const { rows: indexes } = await readOnlyQuery(
@@ -207,7 +236,7 @@ server.tool(
          FROM pg_indexes
          WHERE schemaname = $1 AND tablename = $2
          ORDER BY indexname`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
 
       return jsonTxt({
@@ -215,7 +244,7 @@ server.tool(
         schema: safeS,
         table: safeT,
         columns,
-        primary_key: primaryKey.map(r => r.column_name),
+        primary_key: primaryKey.map((r) => r.column_name),
         foreign_keys: foreignKeys,
         uniques,
         indexes,
@@ -223,7 +252,7 @@ server.tool(
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -262,13 +291,18 @@ server.tool(
          WHERE tc.constraint_type = 'FOREIGN KEY'
            AND ccu.table_schema = $1 AND ccu.table_name = $2
          ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position`,
-        [safeS, safeT]
+        [safeS, safeT],
       );
-      return jsonTxt({ success: true, target: `${safeS}.${safeT}`, total: rows.length, referenced_by: rows });
+      return jsonTxt({
+        success: true,
+        target: `${safeS}.${safeT}`,
+        total: rows.length,
+        referenced_by: rows,
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -284,13 +318,17 @@ server.tool(
   async ({ table, schema }) => {
     try {
       const { rows } = await readOnlyQuery(
-        `SELECT COUNT(*)::bigint AS total FROM ${qualified(schema, table)}`
+        `SELECT COUNT(*)::bigint AS total FROM ${qualified(schema, table)}`,
       );
-      return jsonTxt({ success: true, table: `${safeIdent(schema)}.${safeIdent(table)}`, total: Number(rows[0].total) });
+      return jsonTxt({
+        success: true,
+        table: `${safeIdent(schema)}.${safeIdent(table)}`,
+        total: Number(rows[0].total),
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -303,17 +341,28 @@ server.tool(
     table: z.string(),
     schema: z.string().optional().default(DEFAULT_SCHEMA),
     page: z.number().int().positive().optional().default(1),
-    limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(HARD_MAX_ROWS)
+      .optional()
+      .default(MAX_ROWS),
     orderBy: z.string().optional().describe("Coluna pra ORDER BY (opcional)"),
     direction: z.enum(["ASC", "DESC"]).optional().default("ASC"),
-    where: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    where: z
+      .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
       .optional()
-      .describe('Filtros de igualdade: { "coluna": valor, ... }. Valor null vira IS NULL.'),
+      .describe(
+        'Filtros de igualdade: { "coluna": valor, ... }. Valor null vira IS NULL.',
+      ),
   },
   async ({ table, schema, page, limit, orderBy, direction, where }) => {
     try {
       const offset = (page - 1) * limit;
-      const order = orderBy ? `ORDER BY "${safeIdent(orderBy)}" ${direction}` : "ORDER BY 1";
+      const order = orderBy
+        ? `ORDER BY "${safeIdent(orderBy)}" ${direction}`
+        : "ORDER BY 1";
 
       const whereClauses = [];
       const params = [];
@@ -329,16 +378,25 @@ server.tool(
           }
         }
       }
-      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+      const whereSql = whereClauses.length
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
 
       params.push(limit, offset);
       const sql = `SELECT * FROM ${qualified(schema, table)} ${whereSql} ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`;
       const { rows } = await readOnlyQuery(sql, params);
-      return jsonTxt({ success: true, page, limit, total: rows.length, filters: where || {}, records: rows });
+      return jsonTxt({
+        success: true,
+        page,
+        limit,
+        total: rows.length,
+        filters: where || {},
+        records: rows,
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -350,7 +408,11 @@ server.tool(
   {
     table: z.string(),
     value: z.union([z.string(), z.number()]).describe("Valor procurado"),
-    column: z.string().optional().default("id").describe("Coluna usada na comparação (default: id)"),
+    column: z
+      .string()
+      .optional()
+      .default("id")
+      .describe("Coluna usada na comparação (default: id)"),
     schema: z.string().optional().default(DEFAULT_SCHEMA),
   },
   async ({ table, value, column, schema }) => {
@@ -358,13 +420,16 @@ server.tool(
       const sql = `SELECT * FROM ${qualified(schema, table)} WHERE "${safeIdent(column)}" = $1 LIMIT 1`;
       const { rows } = await readOnlyQuery(sql, [value]);
       if (rows.length === 0) {
-        return jsonTxt({ success: false, error: `Registro com ${column}='${value}' não encontrado em ${schema}.${table}` });
+        return jsonTxt({
+          success: false,
+          error: `Registro com ${column}='${value}' não encontrado em ${schema}.${table}`,
+        });
       }
       return jsonTxt({ success: true, record: rows[0] });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -378,7 +443,13 @@ server.tool(
     column: z.string().describe("Coluna de texto onde aplicar o ILIKE"),
     text: z.string().min(1).describe("Trecho de texto a procurar"),
     schema: z.string().optional().default(DEFAULT_SCHEMA),
-    limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(HARD_MAX_ROWS)
+      .optional()
+      .default(MAX_ROWS),
   },
   async ({ table, column, text, schema, limit }) => {
     try {
@@ -388,7 +459,7 @@ server.tool(
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -401,7 +472,13 @@ server.tool(
     table: z.string(),
     column: z.string(),
     schema: z.string().optional().default(DEFAULT_SCHEMA),
-    limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(HARD_MAX_ROWS)
+      .optional()
+      .default(MAX_ROWS),
   },
   async ({ table, column, schema, limit }) => {
     try {
@@ -416,12 +493,12 @@ server.tool(
         success: true,
         column: safeCol,
         total: rows.length,
-        values: rows.map(r => ({ value: r.value, count: Number(r.count) })),
+        values: rows.map((r) => ({ value: r.value, count: Number(r.count) })),
       });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -439,11 +516,16 @@ server.tool(
     try {
       const sql = `SELECT * FROM ${qualified(schema, table)} ORDER BY random() LIMIT $1`;
       const { rows } = await readOnlyQuery(sql, [n]);
-      return jsonTxt({ success: true, table: `${safeIdent(schema)}.${safeIdent(table)}`, total: rows.length, sample: rows });
+      return jsonTxt({
+        success: true,
+        table: `${safeIdent(schema)}.${safeIdent(table)}`,
+        total: rows.length,
+        sample: rows,
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -467,11 +549,16 @@ server.tool(
         GROUP BY n.nspname, t.typname
         ORDER BY t.typname`;
       const { rows } = await readOnlyQuery(sql, [safeIdent(schema)]);
-      return jsonTxt({ success: true, schema: safeIdent(schema), total: rows.length, enums: rows });
+      return jsonTxt({
+        success: true,
+        schema: safeIdent(schema),
+        total: rows.length,
+        enums: rows,
+      });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -481,8 +568,16 @@ server.tool(
   "runSelect",
   "Executa SELECT/WITH/SHOW/EXPLAIN arbitrário em modo READ ONLY. Bloqueia qualquer comando de escrita. Resultado limitado.",
   {
-    sql: z.string().describe("Query SQL — DEVE iniciar com SELECT, WITH, SHOW ou EXPLAIN"),
-    limit: z.number().int().positive().max(HARD_MAX_ROWS).optional().default(MAX_ROWS),
+    sql: z
+      .string()
+      .describe("Query SQL — DEVE iniciar com SELECT, WITH, SHOW ou EXPLAIN"),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(HARD_MAX_ROWS)
+      .optional()
+      .default(MAX_ROWS),
   },
   async ({ sql, limit }) => {
     const check = isReadOnlySql(sql);
@@ -495,13 +590,13 @@ server.tool(
       return jsonTxt({
         success: true,
         total: rows.length,
-        columns: fields?.map(f => f.name) ?? [],
+        columns: fields?.map((f) => f.name) ?? [],
         data: rows,
       });
     } catch (error) {
       return jsonTxt({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 // ========================================
@@ -512,7 +607,9 @@ await server.connect(transport);
 console.error("verus-mcp-geral v2.1.0 rodando via STDIO (READ ONLY)...");
 
 const shutdown = async () => {
-  try { await pool.end(); } catch {}
+  try {
+    await pool.end();
+  } catch {}
   process.exit(0);
 };
 process.on("SIGTERM", shutdown);
