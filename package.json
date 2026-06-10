@@ -1,6 +1,6 @@
 {
   "name": "@expertcustom/verus-mcp-geral",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "MCP server de tools de negocio do Verus — consome a API /ia-dados (sem acesso direto ao banco)",
   "license": "UNLICENSED",
   "type": "module",

@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.0.0",
+  version: "3.1.0",
 });
 
 function jsonTxt(obj) {
@@ -113,6 +113,16 @@ server.tool(
 );
 
 // ========================================
+// Tool: getCombustivel
+// ========================================
+server.tool(
+  "getCombustivel",
+  "Gastos com combustíveis e lubrificantes (elemento 339030/01) acumulados no ano: empenhado/liquidado/pago, comparação com o ano anterior e top 5 órgãos. Use para 'quanto gastamos com combustível?'.",
+  { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
+  async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/combustivel", { municipio_id, ano, mes })),
+);
+
+// ========================================
 // Tool: getSaldosBancarios
 // ========================================
 server.tool(
@@ -147,7 +157,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.0.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.1.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
