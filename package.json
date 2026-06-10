@@ -1,7 +1,7 @@
 {
   "name": "@expertcustom/verus-mcp-geral",
-  "version": "2.1.0",
-  "description": "MCP server para consultas read-only no Postgres do Verus",
+  "version": "3.0.0",
+  "description": "MCP server de tools de negocio do Verus — consome a API /ia-dados (sem acesso direto ao banco)",
   "license": "UNLICENSED",
   "type": "module",
   "main": "index.js",
@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "pg": "^8.13.1",
     "zod": "^3.24.0"
   }
 }
