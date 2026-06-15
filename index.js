@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.1.0",
+  version: "3.2.0",
 });
 
 function jsonTxt(obj) {
@@ -103,6 +103,16 @@ server.tool(
 );
 
 // ========================================
+// Tool: getEducacao
+// ========================================
+server.tool(
+  "getEducacao",
+  "Índices de educação do RREO Anexo 8 — mesma apuração do painel: 25% MDE (mínimo constitucional em manutenção e desenvolvimento do ensino) e FUNDEB (70% remuneração, 50% e 15% do VAAT), cada um com valor, mínimo legal e status (cumprido/alerta/descumprido), mais os totais de receita-base, dedução FUNDEB e despesa MDE. Use para 'estamos aplicando os 25% em educação?', 'cumprimos o FUNDEB?', perguntas sobre MDE/educação.",
+  { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
+  async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/educacao", { municipio_id, ano, mes })),
+);
+
+// ========================================
 // Tool: getDespesa
 // ========================================
 server.tool(
@@ -157,7 +167,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.1.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.2.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
