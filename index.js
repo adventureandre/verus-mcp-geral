@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.3.1",
+  version: "3.3.2",
 });
 
 function jsonTxt(obj) {
@@ -151,9 +151,10 @@ server.tool(
     orgao: z.string().optional().describe("Nome (ou trecho) do órgão, ex.: 'FMAS', 'Fundo Municipal de Saúde'."),
     favoritas: z.boolean().optional().describe("Se true, soma apenas as contas marcadas como favoritas pelo gestor (exige telefone)."),
     telefone: z.string().optional().describe("Telefone do remetente no WhatsApp; o Verus resolve o gestor e valida município/permissão. Obrigatório para o recorte de favoritas."),
+    grupo: z.enum(["corrente", "anteriores", "ambos"]).optional().describe("Grupo da fonte: 'corrente' (exercício corrente), 'anteriores' (exercícios anteriores) ou 'ambos' (padrão). Use só quando o gestor pedir explicitamente um grupo; o padrão 'ambos' já traz o total com a decomposição corrente/anterior."),
   },
-  async ({ municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone }) =>
-    jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone })),
+  async ({ municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo }) =>
+    jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo })),
 );
 
 // ========================================
@@ -181,7 +182,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.3.1 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.3.2 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
