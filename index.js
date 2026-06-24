@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.3.0",
+  version: "3.3.1",
 });
 
 function jsonTxt(obj) {
@@ -181,7 +181,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.3.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.3.1 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
