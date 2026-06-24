@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.2.0",
+  version: "3.3.0",
 });
 
 function jsonTxt(obj) {
@@ -137,9 +137,23 @@ server.tool(
 // ========================================
 server.tool(
   "getSaldosBancarios",
-  "Saldo em caixa (somatório do saldo final das contas bancárias) do período mais recente com dados — ou de ano/mês específicos. Use para 'quanto temos em caixa?'.",
-  { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
-  async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes })),
+  "Saldo em caixa (saldo final das contas bancárias) do período mais recente com dados — ou de ano/mês específicos. " +
+    "Aceita recortes opcionais: por nome de conta (ex.: 'ICMS', 'FPM'), por fonte de recurso, por órgão ou só as contas favoritas do gestor; sem recorte, retorna o total do município. " +
+    "Os valores vêm prontos do servidor (não calcule nem some). " +
+    "Quando a pergunta vier pelo WhatsApp, passe sempre o `telefone` do remetente para o Verus validar a permissão. " +
+    "Use para 'quanto temos em caixa?', 'qual o saldo da conta do FPM?', 'saldo das minhas contas favoritas'.",
+  {
+    municipio_id: municipioId,
+    ano: anoOpt,
+    mes: mesOpt,
+    conta: z.string().optional().describe("Nome (ou trecho) da conta, ex.: 'ICMS', 'FPM'. Match parcial; o servidor soma as contas que casam e informa quantas."),
+    fonte: z.string().optional().describe("Código da fonte de recurso para filtrar (ex.: '100')."),
+    orgao: z.string().optional().describe("Nome (ou trecho) do órgão, ex.: 'FMAS', 'Fundo Municipal de Saúde'."),
+    favoritas: z.boolean().optional().describe("Se true, soma apenas as contas marcadas como favoritas pelo gestor (exige telefone)."),
+    telefone: z.string().optional().describe("Telefone do remetente no WhatsApp; o Verus resolve o gestor e valida município/permissão. Obrigatório para o recorte de favoritas."),
+  },
+  async ({ municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone }) =>
+    jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone })),
 );
 
 // ========================================
@@ -167,7 +181,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.2.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.3.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
