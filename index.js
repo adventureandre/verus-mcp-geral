@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.3.2",
+  version: "3.4.0",
 });
 
 function jsonTxt(obj) {
@@ -140,6 +140,7 @@ server.tool(
   "Saldo em caixa (saldo final das contas bancárias) do período mais recente com dados — ou de ano/mês específicos. " +
     "Aceita recortes opcionais: por nome de conta (ex.: 'ICMS', 'FPM'), por fonte de recurso, por órgão ou só as contas favoritas do gestor; sem recorte, retorna o total do município. " +
     "Os valores vêm prontos do servidor (não calcule nem some). " +
+    "A lista detalhada `por_conta` traz por padrão as 10 maiores contas (use `limite` para pedir mais/menos); os totais e `qtd_contas` são sempre do conjunto completo, independentemente do `limite`. " +
     "Quando a pergunta vier pelo WhatsApp, passe sempre o `telefone` do remetente para o Verus validar a permissão. " +
     "Use para 'quanto temos em caixa?', 'qual o saldo da conta do FPM?', 'saldo das minhas contas favoritas'.",
   {
@@ -152,9 +153,10 @@ server.tool(
     favoritas: z.boolean().optional().describe("Se true, soma apenas as contas marcadas como favoritas pelo gestor (exige telefone)."),
     telefone: z.string().optional().describe("Telefone do remetente no WhatsApp; o Verus resolve o gestor e valida município/permissão. Obrigatório para o recorte de favoritas."),
     grupo: z.enum(["corrente", "anteriores", "ambos"]).optional().describe("Grupo da fonte: 'corrente' (exercício corrente), 'anteriores' (exercícios anteriores) ou 'ambos' (padrão). Use só quando o gestor pedir explicitamente um grupo; o padrão 'ambos' já traz o total com a decomposição corrente/anterior."),
+    limite: z.number().int().min(1).max(100).optional().describe("Quantas contas trazer na lista `por_conta` (maiores saldos primeiro). Padrão 10, máx 100. Não afeta os totais nem `qtd_contas`. Peça poucas (ex.: 3-5) quando o gestor quiser só 'as maiores'; aumente só se ele pedir a lista completa."),
   },
-  async ({ municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo }) =>
-    jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo })),
+  async ({ municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo, limite }) =>
+    jsonTxt(await apiGet("/saldos", { municipio_id, ano, mes, conta, fonte, orgao, favoritas, telefone, grupo, limite })),
 );
 
 // ========================================
@@ -162,9 +164,11 @@ server.tool(
 // ========================================
 server.tool(
   "getAgenda",
-  "Obrigações da agenda do município ainda não cumpridas: próximas a vencer e atrasadas (com data limite, área temática e sistema de envio). Use para 'o que vence essa semana?', 'estamos atrasados com algo?'.",
-  { municipio_id: municipioId },
-  async ({ municipio_id }) => jsonTxt(await apiGet("/agenda", { municipio_id })),
+  "Obrigações da agenda do município ainda não cumpridas: próximas a vencer e atrasadas (com data limite, área temática e sistema de envio). " +
+    "A lista `obrigacoes` traz por padrão as 10 mais próximas (use `limite`); `total_pendentes` é sempre o total do conjunto. " +
+    "Use para 'o que vence essa semana?', 'estamos atrasados com algo?'.",
+  { municipio_id: municipioId, limite: z.number().int().min(1).max(100).optional().describe("Quantas obrigações trazer na lista (mais próximas primeiro). Padrão 10, máx 100. Não afeta `total_pendentes`.") },
+  async ({ municipio_id, limite }) => jsonTxt(await apiGet("/agenda", { municipio_id, limite })),
 );
 
 // ========================================
@@ -172,9 +176,10 @@ server.tool(
 // ========================================
 server.tool(
   "getDiligencias",
-  "Diligências do TCM-GO em aberto para o município, com número do processo, status e dias restantes do prazo.",
-  { municipio_id: municipioId },
-  async ({ municipio_id }) => jsonTxt(await apiGet("/diligencias", { municipio_id })),
+  "Diligências do TCM-GO em aberto para o município, com número do processo, status e dias restantes do prazo. " +
+    "A lista `diligencias` traz por padrão as 10 de prazo mais próximo (use `limite`); `total_abertas` é sempre o total do conjunto.",
+  { municipio_id: municipioId, limite: z.number().int().min(1).max(100).optional().describe("Quantas diligências trazer na lista (prazo mais próximo primeiro). Padrão 10, máx 100. Não afeta `total_abertas`.") },
+  async ({ municipio_id, limite }) => jsonTxt(await apiGet("/diligencias", { municipio_id, limite })),
 );
 
 // ========================================
@@ -182,7 +187,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.3.2 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.4.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
