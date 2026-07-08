@@ -1,18 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * verus-mcp-geral v3 — tools de NEGÓCIO consumindo a API do Verus (/ia-dados).
- *
- * v2 fazia SQL read-only direto no Postgres; v3 chama os endpoints do backend
- * Verus, que aplicam a MESMA lógica dos painéis (RCL Anexo 3 com ajustes,
- * DTP/limites da LRF, expurgo RPPS na receita...). A IA responde o mesmo
- * número que a tela mostra, no ambiente certo, sem acesso ao banco.
- *
- * Envs obrigatórias:
- *   VERUS_API_URL   — base da API (ex: https://api.verusvh.com.br)
- *   IA_SERVICE_KEY  — service key das rotas /ia-dados (header X-API-Key)
- */
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
