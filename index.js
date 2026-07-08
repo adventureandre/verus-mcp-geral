@@ -28,7 +28,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.4.0",
+  version: "3.5.0",
 });
 
 function jsonTxt(obj) {
@@ -100,6 +100,18 @@ server.tool(
   "Receita total arrecadada acumulada no ano (com expurgo RPPS, igual ao card do painel), com comparação ao mesmo período do ano anterior.",
   { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
   async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/receita", { municipio_id, ano, mes })),
+);
+
+// ========================================
+// Tool: getReceitaPropria
+// ========================================
+server.tool(
+  "getReceitaPropria",
+  "Receitas próprias (tributárias municipais) arrecadadas acumuladas no ano, DETALHADAS por tipo: ISSQN, IPTU, IRRF, ITBI, Taxas e Contribuição de Melhoria — mesma apuração do painel Receitas Próprias, com comparação ao mesmo período do ano anterior. " +
+    "Retorna `total` e a lista `por_tipo` (cada item com tipo, arrecadado_acumulado, ano anterior e variação). Os valores vêm prontos (não some nem calcule). " +
+    "Use quando o gestor pedir um imposto/tributo municipal específico, ex.: 'quanto arrecadamos de ITBI?', 'IPTU do ano', 'ISS acumulado'. Para a receita TOTAL do município use getReceita.",
+  { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
+  async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/receita-propria", { municipio_id, ano, mes })),
 );
 
 // ========================================
@@ -187,7 +199,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.4.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.5.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
