@@ -15,7 +15,7 @@ if (!VERUS_API_URL || !IA_SERVICE_KEY) {
 
 const server = new McpServer({
   name: "verus-mcp-geral",
-  version: "3.5.0",
+  version: "3.5.1",
 });
 
 function jsonTxt(obj) {
@@ -74,7 +74,7 @@ server.tool(
 // ========================================
 server.tool(
   "getLimitePessoal",
-  "Indicador de despesa com pessoal (LRF): DTP, RCL ajustada, percentual e status contra os limites do Executivo municipal (54% máximo, 51,3% prudencial, 48,6% alerta). Use para 'estamos dentro do limite de pessoal?', 'qual o % de pessoal?'.",
+  "Indicador de despesa com pessoal (LRF): DTP, RCL ajustada, percentual e status contra os limites do município (visão global, inclui Legislativo — igual ao painel): 60% máximo, 57% prudencial, 54% alerta. Os limites e o status vêm prontos do servidor (não recalcule). Use para 'estamos dentro do limite de pessoal?', 'qual o % de pessoal?'.",
   { municipio_id: municipioId, ano: anoOpt, mes: mesOpt },
   async ({ municipio_id, ano, mes }) => jsonTxt(await apiGet("/pessoal", { municipio_id, ano, mes })),
 );
@@ -186,7 +186,7 @@ server.tool(
 // ========================================
 const transport = new StdioServerTransport();
 await server.connect(transport);
-console.error("verus-mcp-geral v3.5.0 rodando via STDIO (HTTP → Verus /ia-dados)...");
+console.error("verus-mcp-geral v3.5.1 rodando via STDIO (HTTP → Verus /ia-dados)...");
 
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));
